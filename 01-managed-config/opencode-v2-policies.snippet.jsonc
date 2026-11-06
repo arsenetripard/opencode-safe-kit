@@ -1,0 +1,18 @@
+// =============================================================================
+//  OPTIONAL - only if your pinned version is OpenCode 2.x
+//  Merge into the MANAGED config (system path). In V2, policies from the
+//  system config outrank global and project policies, so a cloned repo cannot
+//  re-enable a provider. Ordinary settings (permissions) cannot stop a user or
+//  a repo from ADDING providers/MCP servers/plugins - policies can (providers).
+//  Feature is flagged "experimental" upstream: re-test after any upgrade.
+// =============================================================================
+{
+  "experimental": {
+    "policies": [
+      { "effect": "deny",  "action": "provider.use", "resource": "*" },
+      { "effect": "allow", "action": "provider.use", "resource": "<LLMAAS_PROVIDER_ID>" }
+    ]
+  },
+  // V2-native switch that removes the web search tool from model requests
+  "websearch": false
+}

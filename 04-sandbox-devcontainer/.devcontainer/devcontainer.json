@@ -1,0 +1,26 @@
+{
+  "name": "opencode-hackathon-sandbox",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  // NET_ADMIN/NET_RAW only so the root-owned firewall script can set iptables.
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW",
+    "--memory=8g",
+    "--cpus=4"
+  ],
+  "containerEnv": {
+    "ALLOWED_HOSTS": "<llmaas.gateway.internal> <artifactory.internal>",
+    "LLMAAS_API_KEY": "${localEnv:LLMAAS_API_KEY}"
+  },
+  // Only the project is mounted. No $HOME, no ~/.ssh, no docker socket.
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=opencode-state-${devcontainerId},target=/home/node/.local/share/opencode,type=volume"
+  ],
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "remoteUser": "node"
+}

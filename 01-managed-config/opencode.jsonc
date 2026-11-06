@@ -1,0 +1,360 @@
+// =============================================================================
+//  Hackathon hardened OpenCode configuration
+//  Syntax: OpenCode V1 (also read and normalised in memory by OpenCode V2)
+//
+//  WHERE TO PUT IT (best -> acceptable):
+//   1. Managed / system config (highest precedence, NOT user-overridable):
+//        Linux   : /etc/opencode/opencode.jsonc
+//        Windows : %ProgramData%\opencode\opencode.jsonc
+//        macOS   : /Library/Application Support/opencode/opencode.jsonc
+//   2. If participants have no admin rights: use 02-launcher/oc-safe, which
+//      injects the comment-free copy (opencode.json) via OPENCODE_CONFIG_CONTENT.
+//   3. Last resort: ~/.config/opencode/opencode.json  (WEAK: any project
+//      opencode.json in a cloned repo overrides it).
+//
+//  Replace every <PLACEHOLDER>. Keep your existing "provider" block (you said
+//  you already have the LLMaaS connection) and make sure its ID matches
+//  enabled_providers / model / small_model below.
+//
+//  Pattern rules: last matching rule wins -> catch-all first, exceptions after,
+//  hard denies LAST so nothing can re-allow them.
+// =============================================================================
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ---------------------------------------------------------------------------
+  // 1. DATA PERIMETER: only the on-prem LLM platform can ever be used
+  // ---------------------------------------------------------------------------
+  // Allowlist of providers. Anything else (incl. the built-in "opencode"/Zen
+  // provider) is not loaded, even if a key is lying around in env vars.
+  "enabled_providers": ["<LLMAAS_PROVIDER_ID>"],
+
+  "model": "<LLMAAS_PROVIDER_ID>/<MAIN_MODEL_ID>",
+
+  // CRITICAL: small_model is used for side tasks (session titles...). If unset,
+  // OpenCode may pick a hosted default. Pin it to an internal model.
+  "small_model": "<LLMAAS_PROVIDER_ID>/<SMALL_MODEL_ID>",
+
+  // No public share links of sessions (would upload conversation = code).
+  "share": "disabled",
+
+  // No update checks to the internet; you pin the version for the event.
+  "autoupdate": false,
+
+  // Keep snapshots ON: they are the participants' "undo" for agent edits.
+  "snapshot": true,
+
+  // ---------------------------------------------------------------------------
+  // 2. PERMISSIONS  (UX guardrail, NOT a security boundary - see README)
+  // ---------------------------------------------------------------------------
+  "permission": {
+    // Default for anything not listed below: ask the human.
+    "*": "ask",
+
+    // --- Low-risk, read-only, in-workspace tools: no friction --------------
+    "glob": "allow",
+    "grep": "allow",
+    "lsp": "allow",
+    "todowrite": "allow",
+    "question": "allow",
+    "task": "allow",
+
+    // --- Skills can carry instructions + scripts: confirm before loading ----
+    "skill": "ask",
+
+    // --- Anything that reaches outside the box: blocked ---------------------
+    // webfetch/websearch = both an exfiltration channel and the #1 indirect
+    // prompt-injection vector. Websearch also sends queries to 3rd parties.
+    "webfetch": "deny",
+    "websearch": "deny",
+
+    // Any access outside the folder opencode was started in needs approval.
+    // (V2 ALLOWS this by default - this line restores a safe posture.)
+    // Secret paths (~/.ssh, ~/.aws...) stay denied via read/bash rules.
+    "external_directory": "ask",
+
+    // Same tool call repeated 3x with identical input -> ask.
+    "doom_loop": "ask",
+
+    // --- Reading files -------------------------------------------------------
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.env.sample": "allow",
+      "*.pem": "deny",
+      "*.key": "deny",
+      "*.p12": "deny",
+      "*.pfx": "deny",
+      "*.jks": "deny",
+      "*.keystore": "deny",
+      "*id_rsa*": "deny",
+      "*id_ed25519*": "deny",
+      "*.npmrc": "deny",
+      "*.pypirc": "deny",
+      "*.netrc": "deny",
+      "*.git-credentials": "deny",
+      "*settings-security.xml": "deny",
+      "*/.ssh/*": "deny",
+      "*/.aws/*": "deny",
+      "*/.azure/*": "deny",
+      "*/.kube/*": "deny",
+      "*/.docker/config.json": "deny"
+    },
+
+    // --- Editing files ------------------------------------------------------
+    // Vibe coding needs autonomy INSIDE the workspace (NVIDIA tiering:
+    // read-write in workspace without approval, EXCEPT agent config files).
+    "edit": {
+      "*": "allow",
+
+      // Agent configuration / instruction files: the agent must never modify
+      // them (persistence vector for prompt injection). Humans edit by hand.
+      "*AGENTS.md": "deny",
+      "*CLAUDE.md": "deny",
+      "*opencode.json": "deny",
+      "*opencode.jsonc": "deny",
+      "*.opencode/*": "deny",
+      "*.cursorrules": "deny",
+      "*.github/*": "deny",
+      "*.gitlab-ci.yml": "deny",
+      "*.devcontainer/*": "deny",
+      "*.pre-commit-config.yaml": "deny",
+      "*.git/*": "deny",
+      "*.gitattributes": "deny",
+      "*.vscode/*": "deny",
+
+      // Secrets & registry configs
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.npmrc": "deny",
+      "*.pypirc": "deny",
+      "*settings.xml": "ask",
+
+      // Dependency manifests: ask, so a human sees every new dependency
+      // (hallucinated / "slopsquatted" package names).
+      "*package.json": "ask",
+      "*requirements*.txt": "ask",
+      "*pyproject.toml": "ask",
+      "*pom.xml": "ask",
+      "*build.gradle*": "ask",
+      "*go.mod": "ask",
+      "*Cargo.toml": "ask",
+      "*.csproj": "ask"
+    },
+
+    // --- Shell -------------------------------------------------------------
+    "bash": {
+      "*": "ask",
+
+      // Read-only / local git
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git branch*": "allow",
+      "git add *": "allow",
+      "git commit *": "allow",
+      "git stash*": "allow",
+      "git restore *": "allow",
+      "git checkout -b *": "allow",
+
+      // Read-only shell helpers
+      "ls*": "allow",
+      "pwd": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "wc *": "allow",
+      "grep *": "allow",
+      "rg *": "allow",
+      "which *": "allow",
+      "mkdir *": "allow",
+      "touch *": "allow",
+      "dir*": "allow",
+      "type *": "allow",
+      "Get-Content *": "allow",
+      "Get-ChildItem*": "allow",
+
+      // Build & test loops (the heart of vibe coding)
+      "npm test*": "allow",
+      "npm run *": "allow",
+      "npx tsc*": "allow",
+      "npx vitest*": "allow",
+      "npx jest*": "allow",
+      "npx eslint*": "allow",
+      "npx prettier*": "allow",
+      "mvn test*": "allow",
+      "mvn verify*": "allow",
+      "mvn compile*": "allow",
+      "mvn package*": "allow",
+      "./mvnw test*": "allow",
+      "./mvnw verify*": "allow",
+      "gradle test*": "allow",
+      "gradle build*": "allow",
+      "./gradlew test*": "allow",
+      "./gradlew build*": "allow",
+      "pytest*": "allow",
+      "python -m pytest*": "allow",
+      "python3 -m pytest*": "allow",
+      "ruff *": "allow",
+      "go test*": "allow",
+      "go build*": "allow",
+      "go vet*": "allow",
+      "cargo test*": "allow",
+      "cargo build*": "allow",
+      "cargo check*": "allow",
+      "dotnet build*": "allow",
+      "dotnet test*": "allow",
+
+      // Dependency installs: ALWAYS a human decision (slopsquatting)
+      "npm install*": "ask",
+      "npm i *": "ask",
+      "npm ci*": "ask",
+      "npx *": "ask",
+      "yarn add*": "ask",
+      "pnpm add*": "ask",
+      "pip install*": "ask",
+      "pip3 install*": "ask",
+      "uv add*": "ask",
+      "uv pip install*": "ask",
+      "poetry add*": "ask",
+      "go get*": "ask",
+      "cargo add*": "ask",
+      "dotnet add*": "ask",
+      "mvn dependency:*": "ask",
+
+      // ===== HARD DENIES (keep LAST) =========================================
+      // Privilege escalation
+      "sudo *": "deny",
+      "su *": "deny",
+      "doas *": "deny",
+      "runas *": "deny",
+      "Start-Process * -Verb RunAs*": "deny",
+
+      // Destructive
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "rm -r /*": "deny",
+      "Remove-Item * -Recurse*": "deny",
+      "rmdir /s *": "deny",
+      "del /s *": "deny",
+      "format *": "deny",
+      "mkfs*": "deny",
+      "dd *": "deny",
+      "chmod 777*": "deny",
+      "chmod -R *": "deny",
+      "chown *": "deny",
+      "git reset --hard*": "deny",
+      "git clean *": "deny",
+      "git push*": "deny",
+      "git remote *": "deny",
+      "git config *": "deny",
+      "git submodule *": "deny",
+      "git filter-*": "deny",
+
+      // Network egress / remote access / exfiltration
+      "curl *": "deny",
+      "wget *": "deny",
+      "Invoke-WebRequest*": "deny",
+      "Invoke-RestMethod*": "deny",
+      "iwr *": "deny",
+      "irm *": "deny",
+      "certutil *": "deny",
+      "bitsadmin *": "deny",
+      "nc *": "deny",
+      "ncat *": "deny",
+      "netcat *": "deny",
+      "socat *": "deny",
+      "telnet *": "deny",
+      "ssh *": "deny",
+      "scp *": "deny",
+      "sftp *": "deny",
+      "ftp *": "deny",
+      "rsync *": "deny",
+      "nslookup *": "deny",
+      "dig *": "deny",
+
+      // Publishing & infra
+      "npm publish*": "deny",
+      "npm config *": "deny",
+      "npm login*": "deny",
+      "npm adduser*": "deny",
+      "pip config *": "deny",
+      "twine *": "deny",
+      "mvn deploy*": "deny",
+      "* deploy*": "deny",
+      "docker *": "deny",
+      "podman *": "deny",
+      "kubectl *": "deny",
+      "oc *": "deny",
+      "helm *": "deny",
+      "terraform *": "deny",
+      "ansible*": "deny",
+      "az *": "deny",
+      "aws *": "deny",
+      "gcloud *": "deny",
+      "vault *": "deny",
+      "gh *": "deny",
+      "glab *": "deny",
+
+      // Secret discovery
+      "env": "deny",
+      "env *": "deny",
+      "printenv*": "deny",
+      "set": "deny",
+      "Get-ChildItem env:*": "deny",
+      "gci env:*": "deny",
+      "dir env:*": "deny",
+      "history*": "deny",
+      "Get-History*": "deny",
+      "security find-*": "deny",
+      "cmdkey*": "deny",
+      "*.env*": "deny",
+      "*id_rsa*": "deny",
+      "*id_ed25519*": "deny",
+      "*/.ssh/*": "deny",
+      "*/.aws/*": "deny",
+      "*/.kube/*": "deny",
+      "*.npmrc*": "deny",
+      "*.git-credentials*": "deny",
+
+      // Persistence
+      "crontab *": "deny",
+      "schtasks *": "deny",
+      "launchctl *": "deny",
+      "systemctl *": "deny",
+      "reg *": "deny",
+      "Set-ItemProperty*": "deny",
+      "setx *": "deny",
+
+      // Interpreter / shell indirection (classic allowlist bypass)
+      "bash -c *": "deny",
+      "sh -c *": "deny",
+      "zsh -c *": "deny",
+      "cmd /c *": "deny",
+      "powershell *": "deny",
+      "pwsh *": "deny",
+      "python -c *": "deny",
+      "python3 -c *": "deny",
+      "node -e *": "deny",
+      "node --eval*": "deny",
+      "perl -e *": "deny",
+      "ruby -e *": "deny",
+      "eval *": "deny",
+      "* | sh*": "deny",
+      "* | bash*": "deny",
+      "*|sh*": "deny",
+      "*|bash*": "deny",
+      "* | iex*": "deny",
+      "*Invoke-Expression*": "deny",
+      "*base64 -d*": "deny",
+      "*base64 --decode*": "deny",
+
+      // The agent must never relaunch itself (e.g. with --auto)
+      "opencode*": "deny"
+    }
+  }
+}

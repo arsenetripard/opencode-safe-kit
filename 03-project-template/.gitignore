@@ -1,0 +1,24 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+.npmrc
+.pypirc
+
+# OpenCode local state (never commit sessions)
+.opencode/sessions/
+.opencode/*.db
+
+# Common build outputs
+node_modules/
+dist/
+build/
+target/
+.venv/
+__pycache__/
+*.log

@@ -1,0 +1,8 @@
+# Optional but recommended: blocks commits containing secrets.
+# Requires pre-commit (pip) + access to the gitleaks hook from your internal mirror.
+# Install once per repo:  pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks   # replace with your internal mirror URL
+    rev: <PINNED_GITLEAKS_TAG>                    # pin an exact tag available in your mirror
+    hooks:
+      - id: gitleaks
